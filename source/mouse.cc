@@ -7,6 +7,8 @@ const char* RIGHT_UP = "right-up";
 const char* MOVE = "move";
 const char* LEFT_DRAG = "left-drag";
 const char* RIGHT_DRAG = "right-drag";
+const char* KEY_UP = "key-up";
+const char* KEY_DOWN = "key-down";
 
 bool IsMouseEvent(CGEventType type) {
 	return type == kCGEventLeftMouseDown ||
@@ -15,7 +17,14 @@ bool IsMouseEvent(CGEventType type) {
 		type == kCGEventRightMouseUp ||
 		type == kCGEventMouseMoved ||
 		type == kCGEventLeftMouseDragged ||
-		type == kCGEventRightMouseDragged;
+		type == kCGEventRightMouseDragged ||
+        type == kCGEventKeyDown ||
+        type == kCGEventKeyUp;
+}
+
+bool IsKeyEvent(CGEventType type) {
+	return type == kCGEventKeyDown ||
+        type == kCGEventKeyUp;
 }
 
 void RunThread(void* arg) {
@@ -24,7 +33,7 @@ void RunThread(void* arg) {
 }
 
 CGEventRef OnMouseEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void* context) {
-	Mouse* mouse = (Mouse*) context;
+    Mouse* mouse = (Mouse*) context;
 	mouse->HandleEvent(type, event);
 
 	return NULL;
@@ -84,25 +93,29 @@ void Mouse::Initialize(Handle<Object> exports) {
 
 void Mouse::Run() {
 	CFRunLoopRef ref = CFRunLoopGetCurrent();
-	CGEventMask mask = CGEventMaskBit(kCGEventLeftMouseDown) |
-		CGEventMaskBit(kCGEventLeftMouseUp) |
-		CGEventMaskBit(kCGEventRightMouseDown) |
-		CGEventMaskBit(kCGEventRightMouseUp) |
-		CGEventMaskBit(kCGEventMouseMoved) |
-		CGEventMaskBit(kCGEventLeftMouseDragged) |
-		CGEventMaskBit(kCGEventRightMouseDragged);
+	CGEventMask mask  = CGEventMaskBit(kCGEventLeftMouseDown) |CGEventMaskBit(kCGEventLeftMouseUp) |
+89.			CGEventMaskBit(kCGEventRightMouseDown) |
+90.			CGEventMaskBit(kCGEventRightMouseUp) |
+91.			CGEventMaskBit(kCGEventMouseMoved) |
+92.			CGEventMaskBit(kCGEventLeftMouseDragged) |
+93.			CGEventMaskBit(kCGEventRightMouseDragged) | CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+
 
 	CFMachPortRef tap = CGEventTapCreate(
-		kCGHIDEventTap,
+		kCGSessionEventTap,
 		kCGHeadInsertEventTap,
-		kCGEventTapOptionListenOnly,
+		kCGEventTapOptionDefault,
 		mask,
 		OnMouseEvent,
 		this);
 
+    
+    
 	CFRunLoopSourceRef source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0);
 	CFRunLoopAddSource(ref, source, kCFRunLoopCommonModes);
 	CGEventTapEnable(tap, true);
+    
+       
 
 	uv_mutex_lock(&async_cond_lock);
 	loop_ref = ref;
@@ -137,11 +150,20 @@ void Mouse::Stop() {
 }
 
 void Mouse::HandleEvent(CGEventType type, CGEventRef e) {
-	if(!IsMouseEvent(type)) return;
+   
+	if(!IsKeyEvent(type) && !!IsMouseEvent(type)) return;
+      
 	CGPoint location = CGEventGetLocation(e);
 	uv_mutex_lock(&async_lock);
-	event->x = location.x;
-	event->y = location.y;
+    if(!IsKeyEvent(type)){
+       event->x = location.x;
+	event->y = location.y; 
+    }
+    else{
+         event->x = 123;
+	event->y = 321; 
+    }
+	
 	event->type = type;
 	uv_mutex_unlock(&async_lock);
 	uv_async_send(async);
@@ -169,6 +191,9 @@ void Mouse::HandleSend() {
 	if(e.type == kCGEventMouseMoved) name = MOVE;
 	if(e.type == kCGEventLeftMouseDragged) name = LEFT_DRAG;
 	if(e.type == kCGEventRightMouseDragged) name = RIGHT_DRAG;
+	if(e.type == kCGEventKeyDown) name = KEY_DOWN;
+	if(e.type == kCGEventKeyUp) name = KEY_UP;
+ 
 
 	Local<Value> argv[] = {
 		Nan::New<String>(name).ToLocalChecked(),
