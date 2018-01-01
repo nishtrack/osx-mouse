@@ -94,11 +94,11 @@ void Mouse::Initialize(Handle<Object> exports) {
 void Mouse::Run() {
 	CFRunLoopRef ref = CFRunLoopGetCurrent();
 	CGEventMask mask  = CGEventMaskBit(kCGEventLeftMouseDown) |CGEventMaskBit(kCGEventLeftMouseUp) |
-89.			CGEventMaskBit(kCGEventRightMouseDown) |
-90.			CGEventMaskBit(kCGEventRightMouseUp) |
-91.			CGEventMaskBit(kCGEventMouseMoved) |
-92.			CGEventMaskBit(kCGEventLeftMouseDragged) |
-93.			CGEventMaskBit(kCGEventRightMouseDragged) | CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+			CGEventMaskBit(kCGEventRightMouseDown) |
+			CGEventMaskBit(kCGEventRightMouseUp) |
+			CGEventMaskBit(kCGEventMouseMoved) |
+			CGEventMaskBit(kCGEventLeftMouseDragged) |
+			CGEventMaskBit(kCGEventRightMouseDragged) | CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
 
 
 	CFMachPortRef tap = CGEventTapCreate(
