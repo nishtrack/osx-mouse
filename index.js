@@ -7,8 +7,8 @@ module.exports = function() {
 	var mouse = null;
 
 	that.once('newListener', function() {
-		mouse = new Mouse(function(type, x, y) {
-			that.emit(type, x, y);
+		mouse = new Mouse(function(type,name) {
+			that.emit(type,name);
 		});
 	});
 
