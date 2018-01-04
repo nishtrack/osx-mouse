@@ -9,6 +9,7 @@ const char* LEFT_DRAG = "left-drag";
 const char* RIGHT_DRAG = "right-drag";
 const char* KEY_UP = "key-up";
 const char* KEY_DOWN = "key-down";
+const char* ALL_EVENT = "all-event";
 
 bool IsMouseEvent(CGEventType type) {
 	return type == kCGEventLeftMouseDown ||
@@ -18,8 +19,7 @@ bool IsMouseEvent(CGEventType type) {
 		type == kCGEventMouseMoved ||
 		type == kCGEventLeftMouseDragged ||
 		type == kCGEventRightMouseDragged ||
-        type == kCGEventKeyDown ||
-        type == kCGEventKeyUp;
+        type == kCGEventKeyDown;
 }
 
 bool IsKeyEvent(CGEventType type) {
@@ -40,6 +40,7 @@ CGEventRef OnMouseEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef even
 }
 
 NAUV_WORK_CB(OnSend) {
+  
 	Mouse* mouse = (Mouse*) async->data;
 	mouse->HandleSend();
 }
@@ -98,13 +99,13 @@ void Mouse::Run() {
 			CGEventMaskBit(kCGEventRightMouseUp) |
 			CGEventMaskBit(kCGEventMouseMoved) |
 			CGEventMaskBit(kCGEventLeftMouseDragged) |
-			CGEventMaskBit(kCGEventRightMouseDragged) | CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
-
+			CGEventMaskBit(kCGEventRightMouseDragged) |
+			CGEventMaskBit(kCGEventKeyDown);
 
 	CFMachPortRef tap = CGEventTapCreate(
-		kCGSessionEventTap,
+		kCGHIDEventTap,
 		kCGHeadInsertEventTap,
-		kCGEventTapOptionDefault,
+		kCGEventTapOptionListenOnly,
 		mask,
 		OnMouseEvent,
 		this);
@@ -150,20 +151,16 @@ void Mouse::Stop() {
 }
 
 void Mouse::HandleEvent(CGEventType type, CGEventRef e) {
-   
-	if(!IsKeyEvent(type) && !!IsMouseEvent(type)) return;
-      
+  
+	if(!IsKeyEvent(type) && !IsMouseEvent(type)) return;
 	CGPoint location = CGEventGetLocation(e);
 	uv_mutex_lock(&async_lock);
-    if(!IsKeyEvent(type)){
-       event->x = location.x;
-	event->y = location.y; 
+   if(!IsKeyEvent(type)){
+       event->name = "mouse";
     }
     else{
-         event->x = 123;
-	event->y = 321; 
+        event->name = "key";
     }
-	
 	event->type = type;
 	uv_mutex_unlock(&async_lock);
 	uv_async_send(async);
@@ -171,13 +168,12 @@ void Mouse::HandleEvent(CGEventType type, CGEventRef e) {
 
 void Mouse::HandleSend() {
 	if(stopped) return;
-
+  
 	Nan::HandleScope scope;
-
 	uv_mutex_lock(&async_lock);
 	MouseEvent e = {
-		event->x,
-		event->y,
+		
+        event->name,
 		event->type
 	};
 	uv_mutex_unlock(&async_lock);
@@ -188,20 +184,20 @@ void Mouse::HandleSend() {
 	if(e.type == kCGEventLeftMouseUp) name = LEFT_UP;
 	if(e.type == kCGEventRightMouseDown) name = RIGHT_DOWN;
 	if(e.type == kCGEventRightMouseUp) name = RIGHT_UP;
-	if(e.type == kCGEventMouseMoved) name = MOVE;
+//	if(e.type == kCGEventMouseMoved) name = MOVE;
 	if(e.type == kCGEventLeftMouseDragged) name = LEFT_DRAG;
 	if(e.type == kCGEventRightMouseDragged) name = RIGHT_DRAG;
-	if(e.type == kCGEventKeyDown) name = KEY_DOWN;
-	if(e.type == kCGEventKeyUp) name = KEY_UP;
+//	if(e.type == kCGEventKeyDown) name = KEY_DOWN;
+	if(e.type == kCGEventKeyDown || e.type == kCGEventMouseMoved) name = ALL_EVENT;
+//	if(e.type == kCGEventKeyUp) name = KEY_UP;
  
-
-	Local<Value> argv[] = {
+Local<Value> argv[] = {
 		Nan::New<String>(name).ToLocalChecked(),
-		Nan::New<Number>(e.x),
-		Nan::New<Number>(e.y)
+		
+    Nan::New<String>(e.name).ToLocalChecked()
 	};
 
-	event_callback->Call(3, argv);
+	event_callback->Call(2, argv);
 }
 
 NAN_METHOD(Mouse::New) {
